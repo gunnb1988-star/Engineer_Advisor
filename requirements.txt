@@ -1,0 +1,5 @@
+streamlit
+streamlit-authenticator
+llama-index
+llama-parse
+openai
