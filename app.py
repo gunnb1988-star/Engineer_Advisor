@@ -20,14 +20,22 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=30
 )
 
-name, authentication_status, username = authenticator.login("Login to Engineer Advisor", location="main")
+# 2. RENDER LOGIN (New v0.4.0+ Syntax)
+# We just call .login() and it returns everything in one 'auth' object
+auth = authenticator.login(label="Login to Engineer Advisor", location="main")
 
-if authentication_status == False:
+# Check if the user is authenticated
+if st.session_state["authentication_status"] == False:
     st.error("Username/password is incorrect")
     st.stop()
-elif authentication_status == None:
+elif st.session_state["authentication_status"] == None:
     st.info("Authorized access only. Please log in.")
     st.stop()
+
+# Set easy-to-use variables for the rest of the app
+name = st.session_state["name"]
+username = st.session_state["username"]
+
 
 # 3. SET API KEYS FROM SECRETS
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
