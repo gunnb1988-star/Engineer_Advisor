@@ -7,12 +7,12 @@ from llama_parse import LlamaParse
 import nest_asyncio
 import os
 
-# 1. SETUP
+# 1. INITIAL SETUP
 nest_asyncio.apply()
 st.set_page_config(page_title="Engineer Advisor", page_icon="📟")
 
-# 2. PULL SECRETS (This replaces the messy credentials list)
-# It looks for the [credentials] section you pasted into the dashboard
+# 2. LOGIN SYSTEM (Latest 2026 Syntax)
+# This pulls everything from your 'Secrets' dashboard
 authenticator = stauth.Authenticate(
     dict(st.secrets['credentials']), 
     "engineer_advisor_session", 
@@ -20,58 +20,59 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=30
 )
 
-# 2. RENDER LOGIN (New v0.4.0+ Syntax)
-# We just call .login() and it returns everything in one 'auth' object
-auth = authenticator.login(label="Login to Engineer Advisor", location="main")
+# Render the login box
+authenticator.login(location="main")
 
-# Check if the user is authenticated
-if st.session_state["authentication_status"] == False:
+# Check if the user is allowed in
+if st.session_state["authentication_status"] is False:
     st.error("Username/password is incorrect")
     st.stop()
-elif st.session_state["authentication_status"] == None:
+elif st.session_state["authentication_status"] is None:
     st.info("Authorized access only. Please log in.")
     st.stop()
 
-# Set easy-to-use variables for the rest of the app
+# If we get here, the user is logged in
 name = st.session_state["name"]
 username = st.session_state["username"]
 
-
-# 3. SET API KEYS FROM SECRETS
+# 3. CONFIGURE AI BRAIN
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 os.environ["LLAMA_CLOUD_API_KEY"] = st.secrets["LLAMA_CLOUD_API_KEY"]
 
-# AI Brain Config
 Settings.llm = OpenAI(model="gpt-4o-mini", temperature=0.1)
 Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 
-# 4. INTERFACE & SIDEBAR
+# 4. SIDEBAR & TOOLS
 with st.sidebar:
     if os.path.exists("logo.png"):
         st.image("logo.png")
     st.title("Engineer Advisor")
     st.write(f"Logged in: **{name}**")
     
-    # Check if user is an admin for uploading
+    # Special tools for you and Joe
     if username in ["admin_user", "joe_hutchings"]:
         st.divider()
-        uploaded_file = st.file_uploader("Upload new manual (PDF)", type="pdf")
+        st.subheader("Admin: Upload Manuals")
+        uploaded_file = st.file_uploader("Upload PDF", type="pdf")
         if uploaded_file:
+            if not os.path.exists("manuals"):
+                os.makedirs("manuals")
             with open(os.path.join("manuals", uploaded_file.name), "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            st.success("Manual saved! Please refresh the page.")
+            st.success("File saved! Refresh the page to index it.")
             
     authenticator.logout("Logout", "sidebar")
 
+# 5. SEARCH ENGINE
 st.title("📟 Engineer Advisor")
 
-# 5. DATA ENGINE
 @st.cache_resource
 def get_advisor_index():
     if not os.path.exists("./manuals"):
         os.makedirs("./manuals")
     
     storage_path = "./storage"
+    # Create index if it doesn't exist
     if not os.path.exists(storage_path):
         parser = LlamaParse(result_type="markdown")
         file_extractor = {".pdf": parser}
@@ -83,17 +84,20 @@ def get_advisor_index():
         sc = StorageContext.from_persist_dir(persist_dir=storage_path)
         return load_index_from_storage(sc)
 
+# Load the data
 index = get_advisor_index()
 query_engine = index.as_query_engine(similarity_top_k=3)
 
-# 6. SEARCH
-query = st.text_input("What is the issue on-site?", placeholder="e.g. factory reset Honeywell Vista")
+# 6. THE CHAT INTERFACE
+query = st.text_input("How can I help you on-site?", placeholder="e.g. wiring for DSC Neo siren")
 
 if query:
-    with st.spinner("Searching manuals..."):
+    with st.spinner("Consulting manuals..."):
         response = query_engine.query(query)
+        st.markdown("### 🛠 Solution")
         st.success(response.response)
         
+        st.markdown("### 📄 Source Documentation")
         for node in response.source_nodes:
             file = node.metadata.get('file_name', 'Manual')
             page = node.metadata.get('page_label', 'Unknown')
