@@ -84,18 +84,26 @@ def get_advisor_index():
         os.makedirs("./manuals")
     
     storage_path = "./storage"
-    # If storage exists (either on server or uploaded to GitHub), load it
-    if os.path.exists(storage_path):
-        sc = StorageContext.from_persist_dir(persist_dir=storage_path)
-        return load_index_from_storage(sc)
-    else:
-        # Otherwise, parse from scratch
-        parser = LlamaParse(result_type="markdown")
-        file_extractor = {".pdf": parser}
-        documents = SimpleDirectoryReader("./manuals", file_extractor=file_extractor).load_data()
-        index = VectorStoreIndex.from_documents(documents)
-        index.storage_context.persist(persist_dir=storage_path)
-        return index
+    
+    # Check if the folder exists AND isn't empty
+    if os.path.exists(storage_path) and len(os.listdir(storage_path)) > 0:
+        try:
+            # Try to load the existing brain
+            sc = StorageContext.from_defaults(persist_dir=storage_path)
+            return load_index_from_storage(sc)
+        except Exception as e:
+            # If the folder is corrupted, delete it and start over
+            st.warning(f"Storage corrupted, rebuilding: {e}")
+            shutil.rmtree(storage_path)
+    
+    # If we get here, we need to build a new brain
+    parser = LlamaParse(result_type="markdown")
+    file_extractor = {".pdf": parser}
+    documents = SimpleDirectoryReader("./manuals", file_extractor=file_extractor).load_data()
+    index = VectorStoreIndex.from_documents(documents)
+    index.storage_context.persist(persist_dir=storage_path)
+    return index
+
 
 index = get_advisor_index()
 query_engine = index.as_query_engine(similarity_top_k=8)
