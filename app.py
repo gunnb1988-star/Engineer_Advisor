@@ -12,8 +12,6 @@ nest_asyncio.apply()
 st.set_page_config(page_title="Engineer Advisor", page_icon="📟")
 
 # 2. LOGIN SYSTEM
-# We use auto_hash=False because we are providing pre-hashed passwords in Secrets
-# This prevents the "Secrets does not support item assignment" error
 authenticator = stauth.Authenticate(
     dict(st.secrets['credentials']), 
     st.secrets['cookie']['name'], 
@@ -33,11 +31,11 @@ elif st.session_state["authentication_status"] is None:
     st.info("Authorized access only. Please log in.")
     st.stop()
 
-# Set user variables for the rest of the app
+# Set user variables
 name = st.session_state["name"]
 username = st.session_state["username"]
 
-# 3. CONFIGURE AI BRAIN (Pulls from Secrets)
+# 3. CONFIGURE AI BRAIN
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 os.environ["LLAMA_CLOUD_API_KEY"] = st.secrets["LLAMA_CLOUD_API_KEY"]
 
@@ -51,7 +49,6 @@ with st.sidebar:
     st.title("Engineer Advisor")
     st.write(f"Logged in: **{name}**")
     
-    # Upload tools for Admin and Joe
     if username in ["admin_user", "joe_hutchings"]:
         st.divider()
         st.subheader("Admin: Add Manuals")
@@ -61,7 +58,7 @@ with st.sidebar:
                 os.makedirs("manuals")
             with open(os.path.join("manuals", uploaded_file.name), "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            st.success("File saved! Refresh the page to update the search index.")
+            st.success("File saved! Refresh the page.")
             
     authenticator.logout("Logout", "sidebar")
 
@@ -74,7 +71,6 @@ def get_advisor_index():
         os.makedirs("./manuals")
     
     storage_path = "./storage"
-    # If index doesn't exist, create it from the manuals folder
     if not os.path.exists(storage_path):
         parser = LlamaParse(result_type="markdown")
         file_extractor = {".pdf": parser}
@@ -86,12 +82,11 @@ def get_advisor_index():
         sc = StorageContext.from_persist_dir(persist_dir=storage_path)
         return load_index_from_storage(sc)
 
-# Load data
 index = get_advisor_index()
 query_engine = index.as_query_engine(similarity_top_k=3)
 
 # 6. SEARCH INTERFACE
-query = st.text_input("How can I help you on-site?", placeholder="e.g. factory reset Honeywell Vista")
+query = st.text_input("How can I help you on-site?", placeholder="e.g. reset Honeywell Vista")
 
 if query:
     with st.spinner("Consulting manuals..."):
@@ -100,5 +95,9 @@ if query:
         st.success(response.response)
         
         st.markdown("### 📄 Source Documentation")
+        # Fixed syntax for the source loop
         for node in response.source_nodes:
-            file =
+            metadata = node.metadata
+            file_name = metadata.get('file_name', 'Manual')
+            page_num = metadata.get('page_label', 'Unknown')
+            st.info(f"Ref: **{file_name}** (Page {page_num})")
