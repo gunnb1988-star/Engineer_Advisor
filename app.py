@@ -62,7 +62,25 @@ def get_advisor_index():
         return load_index_from_storage(sc)
 
 index = get_advisor_index()
-query_engine = index.as_query_engine(similarity_top_k=3)
+from llama_index.core import PromptTemplate
+
+# This forces the AI to provide full, detailed steps
+new_summary_tmpl_str = (
+    "Context information is below.\n"
+    "---------------------\n"
+    "{context_str}\n"
+    "---------------------\n"
+    "Given the context information and not prior knowledge, "
+    "answer the query as a lead security engineer. Provide full, detailed, "
+    "step-by-step instructions. If there is a wiring diagram described, "
+    "list every terminal connection. Do not summarize; be exhaustive.\n"
+    "Query: {query_str}\n"
+    "Answer: "
+)
+new_summary_tmpl = PromptTemplate(new_summary_tmpl_str)
+query_engine.update_prompts({"response_synthesizer:text_qa_template": new_summary_tmpl})
+
+query_engine = index.as_query_engine(similarity_top_k=8)
 
 # 6. SEARCH INTERFACE
 st.title("📟 Search Manuals")
