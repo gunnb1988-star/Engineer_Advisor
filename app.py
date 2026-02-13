@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage, Settings
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
@@ -11,33 +10,25 @@ import os
 nest_asyncio.apply()
 st.set_page_config(page_title="Engineer Advisor", page_icon="📟")
 
-# 2. LOGIN SYSTEM
-# Using a more direct way to pull the credentials dictionary
-credentials = dict(st.secrets["credentials"])
+# 2. THE GATEKEEPER (Manual Login)
+if 'auth' not in st.session_state:
+    st.session_state['auth'] = False
 
-authenticator = stauth.Authenticate(
-    credentials,
-    st.secrets["cookie"]["name"],
-    st.secrets["cookie"]["key"],
-    st.secrets["cookie"]["expiry_days"],
-    auto_hash=False
-)
-
-# Render login
-authenticator.login(location="main")
-
-if st.session_state["authentication_status"] is False:
-    st.error("Username/password is incorrect")
-    st.stop()
-elif st.session_state["authentication_status"] is None:
-    st.info("Authorized access only. Please log in.")
+if not st.session_state['auth']:
+    st.title("🔒 Security Login")
+    user = st.text_input("Username").strip()
+    pw = st.text_input("Password", type="password").strip()
+    
+    if st.button("Enter Advisor"):
+        # This looks for 'admin_password' in your Secrets box
+        if pw == st.secrets["admin_password"]:
+            st.session_state['auth'] = True
+            st.rerun()
+        else:
+            st.error("Access Denied")
     st.stop()
 
-# User Details
-name = st.session_state["name"]
-username = st.session_state["username"]
-
-# 3. AI BRAIN SETUP
+# 3. CONFIGURE AI (Only runs if logged in)
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 os.environ["LLAMA_CLOUD_API_KEY"] = st.secrets["LLAMA_CLOUD_API_KEY"]
 
@@ -46,25 +37,13 @@ Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 
 # 4. SIDEBAR
 with st.sidebar:
-    st.title("Engineer Advisor")
-    st.write(f"User: **{name}**")
-    
-    if username in ["admin_user", "joe_hutchings"]:
-        st.divider()
-        st.subheader("Admin Tools")
-        uploaded_file = st.file_uploader("Upload Manual (PDF)", type="pdf")
-        if uploaded_file:
-            if not os.path.exists("manuals"):
-                os.makedirs("manuals")
-            with open(os.path.join("manuals", uploaded_file.name), "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            st.success("Saved! Refresh the page.")
-            
-    authenticator.logout("Logout", "sidebar")
+    st.title("📟 Engineer Advisor")
+    st.success("Authorized Access")
+    if st.button("Logout"):
+        st.session_state['auth'] = False
+        st.rerun()
 
 # 5. DATA ENGINE
-st.title("📟 Engineer Advisor")
-
 @st.cache_resource
 def get_advisor_index():
     if not os.path.exists("./manuals"):
@@ -85,16 +64,15 @@ def get_advisor_index():
 index = get_advisor_index()
 query_engine = index.as_query_engine(similarity_top_k=3)
 
-# 6. INTERFACE
-query = st.text_input("Site Issue / Question:", placeholder="e.g. Galaxy G3 default engineer code")
+# 6. SEARCH INTERFACE
+st.title("📟 Search Manuals")
+query = st.text_input("Describe the fault or ask a question:")
 
 if query:
-    with st.spinner("Searching..."):
+    with st.spinner("Analyzing manuals..."):
         response = query_engine.query(query)
         st.markdown("### 🛠 Solution")
         st.success(response.response)
         
-        st.markdown("### 📄 Sources")
         for node in response.source_nodes:
-            metadata = node.metadata
-            st.info(f"**{metadata.get('file_name', 'Manual')}** (Page {metadata.get('page_label', 'N/A')})")
+            st.info(f"Source: {node.metadata.get('file_name')} (Page {node.metadata.get('page_label')})")
