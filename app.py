@@ -1,5 +1,5 @@
 import streamlit as st
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage, Settings
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage, Settings, PromptTemplate
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 from llama_parse import LlamaParse
@@ -10,7 +10,7 @@ import os
 nest_asyncio.apply()
 st.set_page_config(page_title="Engineer Advisor", page_icon="📟")
 
-# 2. THE GATEKEEPER (Manual Login)
+# 2. THE GATEKEEPER (Simple Login)
 if 'auth' not in st.session_state:
     st.session_state['auth'] = False
 
@@ -20,7 +20,7 @@ if not st.session_state['auth']:
     pw = st.text_input("Password", type="password").strip()
     
     if st.button("Enter Advisor"):
-        # This looks for 'admin_password' in your Secrets box
+        # Just use 'admin_password' in your Secrets
         if pw == st.secrets["admin_password"]:
             st.session_state['auth'] = True
             st.rerun()
@@ -28,7 +28,7 @@ if not st.session_state['auth']:
             st.error("Access Denied")
     st.stop()
 
-# 3. CONFIGURE AI (Only runs if logged in)
+# 3. CONFIGURE AI
 os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 os.environ["LLAMA_CLOUD_API_KEY"] = st.secrets["LLAMA_CLOUD_API_KEY"]
 
@@ -37,7 +37,7 @@ Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 
 # 4. SIDEBAR
 with st.sidebar:
-    st.title("📟 Engineer Advisor")
+    st.title("📟 Advisor")
     st.success("Authorized Access")
     if st.button("Logout"):
         st.session_state['auth'] = False
@@ -62,9 +62,10 @@ def get_advisor_index():
         return load_index_from_storage(sc)
 
 index = get_advisor_index()
-from llama_index.core import PromptTemplate
 
-# This forces the AI to provide full, detailed steps
+# --- THE FIX: Define engine FIRST, then set the prompt ---
+query_engine = index.as_query_engine(similarity_top_k=8)
+
 new_summary_tmpl_str = (
     "Context information is below.\n"
     "---------------------\n"
@@ -79,8 +80,6 @@ new_summary_tmpl_str = (
 )
 new_summary_tmpl = PromptTemplate(new_summary_tmpl_str)
 query_engine.update_prompts({"response_synthesizer:text_qa_template": new_summary_tmpl})
-
-query_engine = index.as_query_engine(similarity_top_k=8)
 
 # 6. SEARCH INTERFACE
 st.title("📟 Search Manuals")
