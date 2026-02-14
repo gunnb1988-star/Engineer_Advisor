@@ -133,21 +133,44 @@ def get_user_password_hash(username):
     users = st.secrets.get("users", {})
     return users.get(username)
 
+def get_admin_users_list():
+    """Get admin users list from secrets - tries multiple formats"""
+    try:
+        # Method 1: Try to get as direct list
+        admin_list = st.secrets.get("admin_users", None)
+        
+        if admin_list is not None:
+            # If it's already a list, return it
+            if isinstance(admin_list, list):
+                return admin_list
+            
+            # If it's a string, try to parse it
+            if isinstance(admin_list, str):
+                # Remove brackets and quotes, split by comma
+                cleaned = admin_list.strip('[]').replace('"', '').replace("'", "")
+                return [u.strip() for u in cleaned.split(",") if u.strip()]
+        
+        # Method 2: Try individual keys (admin_user_1, admin_user_2, etc.)
+        admins = []
+        for i in range(1, 10):  # Check up to 10 admin users
+            key = f"admin_user_{i}"
+            if key in st.secrets:
+                admins.append(st.secrets[key])
+        if admins:
+            return admins
+        
+        # Method 3: Hardcode for now (FALLBACK)
+        # This ensures it works while we debug
+        return ["bgunn", "jhutchings"]
+        
+    except Exception as e:
+        # Emergency fallback
+        return ["bgunn", "jhutchings"]
+
 def get_user_role(username):
     """Get the role of a user from secrets"""
     try:
-        # Get admin users list from secrets
-        admin_users_raw = st.secrets.get("admin_users", [])
-        
-        # Handle different formats
-        if isinstance(admin_users_raw, str):
-            # If it's a string, split by comma
-            admin_users = [u.strip() for u in admin_users_raw.split(",")]
-        elif isinstance(admin_users_raw, list):
-            # If it's already a list, use it directly
-            admin_users = admin_users_raw
-        else:
-            admin_users = []
+        admin_users = get_admin_users_list()
         
         # Check if user is admin
         if username in admin_users:
@@ -160,7 +183,6 @@ def get_user_role(username):
         
         return None
     except Exception as e:
-        # Debug: show what went wrong
         st.error(f"Role detection error: {str(e)}")
         return None
 
@@ -307,17 +329,25 @@ with st.sidebar:
     st.markdown(f"### 👤 {st.session_state['username']} {role_badge}", unsafe_allow_html=True)
     st.caption(f"Session started: {datetime.now().strftime('%H:%M:%S')}")
     
-    # DEBUG INFO - Remove this after confirming it works
-    if st.session_state['username'] == 'bgunn':
-        st.caption(f"DEBUG: Role = {st.session_state.get('user_role')}")
+    # ENHANCED DEBUG INFO
+    if st.session_state['username'] in ['bgunn', 'jhutchings']:
+        st.markdown("---")
+        st.caption("🔍 **DEBUG INFO**")
+        st.caption(f"Role: {st.session_state.get('user_role')}")
         try:
-            admin_list = st.secrets.get("admin_users", [])
-            st.caption(f"DEBUG: Admin list = {admin_list}")
-            st.caption(f"DEBUG: Is in list? {st.session_state['username'] in admin_list}")
+            admin_list = get_admin_users_list()
+            st.caption(f"Admin list: {admin_list}")
+            st.caption(f"In list? {st.session_state['username'] in admin_list}")
+            
+            # Show what secrets actually contains
+            st.caption("**Raw secrets check:**")
+            st.caption(f"'admin_users' exists? {'admin_users' in st.secrets}")
+            if 'admin_users' in st.secrets:
+                st.caption(f"Type: {type(st.secrets['admin_users'])}")
+                st.caption(f"Value: {st.secrets['admin_users']}")
         except Exception as e:
             st.caption(f"DEBUG ERROR: {e}")
-    
-    st.markdown("---")
+        st.markdown("---")
     
     # Title
     st.title("📟 Advisor Tools")
@@ -622,4 +652,4 @@ if query:
 
 # Footer
 st.markdown("---")
-st.caption("Engineer Advisor • Powered by OpenAI & LlamaParse • Version 2.7")
+st.caption("Engineer Advisor • Powered by OpenAI & LlamaParse • Version 2.8 (Fallback)")
