@@ -2,8 +2,8 @@
 .streamlit/secrets.toml
 .env
 
-# Storage and cached data
-storage/
+# Cached data (keep storage/ - it has the pre-built index!)
+# storage/  ← COMMENTED OUT - we want storage in repo!
 *.zip
 storage_backup*
 
