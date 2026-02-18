@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "id": 1,
+    "title": "Reprogram FM4000 keypad after battery change",
+    "content": "change battery then put back on the wall and make sure tamper is closed\n\nYou then have a 2 second window to press 1251, then press the full and part set buttons together twice quickly A green light should stay on\n\nIf you make a mistake you must wait 10 seconds to do it again or it will lock you out\n\nThe type the customer code followed by the next 2 numbers in sequence on the end (ex:-1234 '56', or 1966 '78'",
+    "author": "bgunn",
+    "created": "2026-02-16 00:31:02"
+  },
+  {
+    "id": 2,
+    "title": "Add wireless device to a galaxy",
+    "content": "To add a wireless device, go to the zone you are adding to, press 5 to get to rf options, serial number, B to delete if there is existing, press * then insert battery in device and force tamper, screen will then show signal and device is learnt. ",
+    "author": "bgunn",
+    "created": "2026-02-16 00:32:22"
+  }
+]
