@@ -62,7 +62,7 @@ Now reset codes: prog **** > 8 > type new code."""
     {
         "title": "Setup Vonex App - Agility 3",
         "panel": "agility",
-        "keywords": ["setup", "vonex", "app"],
+        "keywords": ["setup", "vonex", "app", "agility" "agility_3"],
         "answer": """Press button on Vonex for 1 min, 
 Then connect via hot-spot from phone, 
 12345678 = hot-spot password
