@@ -82,7 +82,7 @@ USER code - 7 - code change - enter new code - full set"""
     {
         "title": "Add SmartCom App - Texecom Elite",
         "panel": ["texecom", "elite"],
-        "keywords": ["add", "smartcom", "app", "connect"],
+        "keywords": ["add", "smartcom", "app", "connect", "texecom", "connect"],
         "answer": """Compatibility = Elite series V4+
 
 Connect cable to com ports (4 core to com1, 2 core to com2) 
@@ -110,7 +110,7 @@ System will give you a connect code to type into customer phone on the texecom c
     {
         "title": "Add Pyronix Cloud - Euro/Enforcer",
         "panel": ["euro", "enforcer", "pyronix"],
-        "keywords": ["add", "app", "pyronix", "cloud"],
+        "keywords": ["add", "app", "pyronix", "cloud", "WiFi", "setup"],
         "answer": """Compatibility: V10
 Install digi WiFi - XA into SIA port, 
 Downpowered and reboot panel, 
