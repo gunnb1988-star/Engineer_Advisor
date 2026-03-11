@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:\\\\Users\\\\stephenstroud\\\\Documents\\\\Clients\\\\Gunn\\\\Engineer_Advisor\" && pip show supabase | grep Version)",
+      "Bash(pip show websockets | grep Version)"
+    ]
+  }
+}
