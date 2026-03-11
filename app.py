@@ -6,7 +6,6 @@ from llama_parse import LlamaParse
 import nest_asyncio
 import os
 import shutil
-import hashlib
 from datetime import datetime
 import json
 from supabase import create_client, Client
@@ -390,68 +389,22 @@ def get_quick_guides_as_text():
     return text
 
 # ============================================================================
-# 3. PASSWORD MANAGEMENT FUNCTIONS
+# 3. SUPABASE AUTH FUNCTIONS
 # ============================================================================
 
-def hash_password(password):
-    """Hash password using SHA-256"""
-    return hashlib.sha256(password.encode()).hexdigest()
+def get_user_role_from_supabase(user):
+    """Get role from Supabase user metadata. Defaults to 'user'."""
+    if user and user.user_metadata:
+        return user.user_metadata.get('role', 'user')
+    return 'user'
 
-def verify_password(input_password, stored_hash):
-    """Verify password against stored hash"""
-    return hash_password(input_password) == stored_hash
-
-def load_custom_passwords():
-    """Load custom passwords from file"""
-    password_file = "./data/custom_passwords.json"
-    if os.path.exists(password_file):
-        try:
-            with open(password_file, 'r') as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
-
-def save_custom_password(username, new_password_hash):
-    """Save a custom password for a user"""
-    password_file = "./data/custom_passwords.json"
-    os.makedirs("./data", exist_ok=True)
-    
-    custom_passwords = load_custom_passwords()
-    custom_passwords[username] = new_password_hash
-    
-    with open(password_file, 'w') as f:
-        json.dump(custom_passwords, f, indent=2)
-
-def get_user_password_hash(username):
-    """Get the password hash for a user (custom password takes precedence)"""
-    custom_passwords = load_custom_passwords()
-    if username in custom_passwords:
-        return custom_passwords[username]
-    
-    users = st.secrets.get("users", {})
-    return users.get(username)
-
-def get_admin_users_list():
-    """Get admin users list - hardcoded for reliability"""
-    # Hardcoded admin list (most reliable)
-    return ["bgunn", "jhutchings", "dgreen"]
-
-def get_user_role(username):
-    """Get the role of a user"""
-    try:
-        admin_users = get_admin_users_list()
-        
-        if username in admin_users:
-            return "admin"
-        
-        users = st.secrets.get("users", {})
-        if username in users or username in load_custom_passwords():
-            return "user"
-        
-        return None
-    except Exception as e:
-        return None
+def get_display_name(user):
+    """Get display name from user metadata, fallback to email."""
+    if user and user.user_metadata:
+        name = user.user_metadata.get('name') or user.user_metadata.get('full_name')
+        if name:
+            return name
+    return user.email if user else ''
 
 def is_admin():
     """Check if current user is an admin"""
@@ -465,6 +418,8 @@ if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 if 'username' not in st.session_state:
     st.session_state['username'] = None
+if 'user_email' not in st.session_state:
+    st.session_state['user_email'] = None
 if 'user_role' not in st.session_state:
     st.session_state['user_role'] = None
 if 'login_attempts' not in st.session_state:
@@ -473,6 +428,27 @@ if 'show_password_change' not in st.session_state:
     st.session_state['show_password_change'] = False
 if 'show_add_guide' not in st.session_state:
     st.session_state['show_add_guide'] = False
+
+# Restore Supabase auth session from stored tokens (persists across Streamlit reruns)
+if (not st.session_state['authenticated']
+        and st.session_state.get('access_token')
+        and st.session_state.get('refresh_token')
+        and supabase is not None):
+    try:
+        restored = supabase.auth.set_session(
+            st.session_state['access_token'],
+            st.session_state['refresh_token']
+        )
+        if restored and restored.user:
+            user = restored.user
+            st.session_state['authenticated'] = True
+            st.session_state['username'] = get_display_name(user)
+            st.session_state['user_email'] = user.email
+            st.session_state['user_role'] = get_user_role_from_supabase(user)
+    except Exception:
+        # Tokens expired or invalid — clear them
+        st.session_state.pop('access_token', None)
+        st.session_state.pop('refresh_token', None)
 
 # ============================================================================
 # 5. LOGO DISPLAY FUNCTION
@@ -510,38 +486,46 @@ if not st.session_state['authenticated']:
         st.markdown("---")
         
         with st.form("login_form"):
-            username = st.text_input("Username", placeholder="Enter your username")
+            email = st.text_input("Email", placeholder="Enter your email")
             password = st.text_input("Password", type="password", placeholder="Enter your password")
             submit_button = st.form_submit_button("🔓 Login")
-            
+
             if submit_button:
-                try:
-                    stored_hash = get_user_password_hash(username)
-                    
-                    if stored_hash and verify_password(password, stored_hash):
-                        user_role = get_user_role(username)
-                        
-                        if user_role:
-                            st.session_state['authenticated'] = True
-                            st.session_state['username'] = username
-                            st.session_state['user_role'] = user_role
-                            st.session_state['login_attempts'] = 0
-                            
-                            role_display = "Administrator" if user_role == "admin" else "Engineer"
-                            st.success(f"✅ Welcome, {username}! ({role_display})")
-                            st.rerun()
-                        else:
-                            st.session_state['login_attempts'] += 1
-                            st.error("❌ User not found")
-                    else:
+                if supabase is None:
+                    st.error("❌ Supabase not connected — cannot log in")
+                else:
+                    try:
+                        auth_response = supabase.auth.sign_in_with_password(
+                            {"email": email, "password": password}
+                        )
+                        user = auth_response.user
+                        session = auth_response.session
+
+                        role = get_user_role_from_supabase(user)
+                        display_name = get_display_name(user)
+
+                        st.session_state['authenticated'] = True
+                        st.session_state['username'] = display_name
+                        st.session_state['user_email'] = user.email
+                        st.session_state['user_role'] = role
+                        st.session_state['login_attempts'] = 0
+                        st.session_state['access_token'] = session.access_token
+                        st.session_state['refresh_token'] = session.refresh_token
+
+                        role_display = "Administrator" if role == "admin" else "Engineer"
+                        st.success(f"✅ Welcome, {display_name}! ({role_display})")
+                        st.rerun()
+
+                    except Exception as e:
                         st.session_state['login_attempts'] += 1
-                        st.error("❌ Invalid username or password")
-                    
-                    if st.session_state['login_attempts'] >= 3:
-                        st.warning(f"⚠️ Multiple failed attempts ({st.session_state['login_attempts']})")
-                        
-                except Exception as e:
-                    st.error(f"❌ Authentication error: {str(e)}")
+                        error_msg = str(e)
+                        if 'Invalid login credentials' in error_msg or '400' in error_msg:
+                            st.error("❌ Invalid email or password")
+                        else:
+                            st.error(f"❌ Authentication error: {error_msg}")
+
+                        if st.session_state['login_attempts'] >= 3:
+                            st.warning(f"⚠️ Multiple failed attempts ({st.session_state['login_attempts']})")
         
         with st.expander("ℹ️ Need Help?"):
             st.info("""
@@ -738,24 +722,34 @@ with st.sidebar:
             current_password = st.text_input("Current Password", type="password")
             new_password = st.text_input("New Password", type="password")
             confirm_password = st.text_input("Confirm New Password", type="password")
-            
+
             change_submit = st.form_submit_button("✅ Update Password")
-            
+
             if change_submit:
-                current_hash = get_user_password_hash(st.session_state['username'])
-                
-                if not verify_password(current_password, current_hash):
-                    st.error("❌ Current password incorrect")
-                elif len(new_password) < 6:
+                if len(new_password) < 6:
                     st.error("❌ Password must be 6+ characters")
                 elif new_password != confirm_password:
                     st.error("❌ Passwords don't match")
+                elif supabase is None:
+                    st.error("❌ Supabase not connected")
                 else:
-                    new_hash = hash_password(new_password)
-                    save_custom_password(st.session_state['username'], new_hash)
-                    st.success("✅ Password changed!")
-                    st.session_state['show_password_change'] = False
-                    st.rerun()
+                    try:
+                        # Verify current password by re-authenticating
+                        supabase.auth.sign_in_with_password({
+                            "email": st.session_state['user_email'],
+                            "password": current_password
+                        })
+                        # Current password correct — update to new password
+                        supabase.auth.update_user({"password": new_password})
+                        st.success("✅ Password changed!")
+                        st.session_state['show_password_change'] = False
+                        st.rerun()
+                    except Exception as e:
+                        error_msg = str(e)
+                        if 'Invalid login credentials' in error_msg or '400' in error_msg:
+                            st.error("❌ Current password incorrect")
+                        else:
+                            st.error(f"❌ Error: {error_msg}")
     
     st.markdown("---")
     
@@ -973,11 +967,19 @@ with st.sidebar:
     st.markdown("---")
     
     if st.button("🚪 Logout"):
+        if supabase is not None:
+            try:
+                supabase.auth.sign_out()
+            except Exception:
+                pass
         st.session_state['authenticated'] = False
         st.session_state['username'] = None
+        st.session_state['user_email'] = None
         st.session_state['user_role'] = None
         st.session_state['show_password_change'] = False
         st.session_state['show_add_guide'] = False
+        st.session_state.pop('access_token', None)
+        st.session_state.pop('refresh_token', None)
         st.rerun()
 
 # ============================================================================
