@@ -115,10 +115,21 @@ with tab2:
             st.rerun()
     with col2:
         if st.button("🔄 Rebuild Index", use_container_width=True):
+            # Delete local storage
             if os.path.exists("./storage"):
                 shutil.rmtree("./storage")
+            # Delete index files from Supabase Storage
+            supabase = get_supabase()
+            try:
+                from utils import INDEX_FILES
+                existing = [f['name'] for f in supabase.storage.from_('index').list()]
+                to_delete = [f for f in INDEX_FILES if f in existing]
+                if to_delete:
+                    supabase.storage.from_('index').remove(to_delete)
+            except Exception as e:
+                st.warning(f"Could not clear Supabase index: {e}")
             st.cache_resource.clear()
-            st.success("Index rebuild triggered — visit Search to rebuild")
+            st.success("✅ Index cleared — visit Search to rebuild from scratch")
             st.rerun()
 
     st.markdown("---")
