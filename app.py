@@ -66,21 +66,28 @@ if 'show_password_change' not in st.session_state:
 # Restore Supabase session from stored tokens
 supabase = get_supabase()
 if (not st.session_state['authenticated']
-        and st.session_state.get('access_token')
         and st.session_state.get('refresh_token')
         and supabase is not None):
     try:
-        restored = supabase.auth.set_session(
-            st.session_state['access_token'],
+        # Always use the refresh token to get a fresh access token
+        # This works even if the access token has expired
+        supabase.auth.set_session(
+            st.session_state.get('access_token', ''),
             st.session_state['refresh_token']
         )
-        if restored and restored.user:
-            user = restored.user
+        refreshed = supabase.auth.refresh_session()
+        if refreshed and refreshed.user:
+            user = refreshed.user
+            session = refreshed.session
             st.session_state['authenticated'] = True
             st.session_state['username'] = get_display_name(user)
             st.session_state['user_email'] = user.email
             st.session_state['user_role'] = get_user_role_from_supabase(user)
+            # Store the new fresh tokens
+            st.session_state['access_token'] = session.access_token
+            st.session_state['refresh_token'] = session.refresh_token
     except Exception:
+        # Refresh token expired — user must log in again
         st.session_state.pop('access_token', None)
         st.session_state.pop('refresh_token', None)
 

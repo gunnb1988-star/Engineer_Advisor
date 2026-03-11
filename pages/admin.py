@@ -3,6 +3,7 @@ import os
 import shutil
 import json
 import tempfile
+import threading
 from datetime import datetime
 from utils import require_admin, get_supabase, list_manuals, upload_manual, download_manual, delete_manual, insert_manuals_into_index
 
@@ -21,6 +22,20 @@ with tab1:
     st.subheader("Upload PDF Manuals")
     st.caption("PDFs are stored in Supabase Storage — not in GitHub.")
 
+    # Show background indexing status
+    import builtins as _builtins
+    job = getattr(_builtins, '_index_job', None)
+    if job:
+        if not job['done']:
+            st.warning(f"⏳ Indexing in progress: {', '.join(job['files'])} — you can navigate away safely")
+        elif job['ok']:
+            st.success(f"✅ Indexing complete: {', '.join(job['files'])}")
+            st.cache_resource.clear()
+            _builtins._index_job = None
+        else:
+            st.error(f"❌ Indexing failed: {job['err']}")
+            _builtins._index_job = None
+
     uploaded_files = st.file_uploader("Upload PDF Manuals", type="pdf", accept_multiple_files=True)
 
     if uploaded_files:
@@ -38,17 +53,22 @@ with tab1:
             for name, err in failed:
                 st.error(f"❌ {name} failed to upload: {err}")
 
-            # Step 2 — Incrementally index only the new files
+            # Step 2 — Kick off indexing in a background thread so navigation won't kill it
             if success:
-                with st.spinner(f"Indexing {len(success)} new manual(s) — this may take a moment..."):
-                    indexed, err = insert_manuals_into_index(success)
+                def _index_in_background(filenames):
+                    ok, err = insert_manuals_into_index(filenames)
+                    # Store result in a shared location for status checking
+                    import builtins
+                    builtins._index_job = {"done": True, "ok": ok, "err": err, "files": filenames}
 
-                if indexed:
-                    st.success(f"✅ Uploaded and indexed: {', '.join(success)}")
-                    st.cache_resource.clear()  # Force Search to reload updated index
-                else:
-                    st.warning(f"⚠️ Uploaded but indexing failed: {err}")
-                    st.info("Visit **Search** to trigger a full rebuild")
+                builtins_import = __import__('builtins')
+                builtins_import._index_job = {"done": False, "files": success}
+
+                thread = threading.Thread(target=_index_in_background, args=(success,), daemon=True)
+                thread.start()
+
+                st.success(f"✅ Uploaded: {', '.join(success)}")
+                st.info("🔄 Indexing running in background — you can navigate away safely. Check back here to see when it's done.")
 
     st.markdown("---")
     st.subheader("Current Manuals")
