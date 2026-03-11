@@ -123,38 +123,28 @@ with tab2:
 
     st.markdown("---")
     st.subheader("Storage Status")
+    st.caption("Index and manuals are stored in Supabase Storage.")
 
-    if os.path.exists("./storage"):
-        files = os.listdir("./storage")
-        has_index = any(f.startswith('index_store') for f in files)
-        has_vector = any('vector_store' in f for f in files)
-        st.caption(f"📁 Files in storage: {len(files)}")
-        st.caption(f"{'✅' if has_index else '❌'} index_store.json")
-        st.caption(f"{'✅' if has_vector else '❌'} vector_store.json")
-        st.caption(f"{'✅' if os.path.exists('./storage/.index_ready') else '❌'} .index_ready marker")
+    supabase = get_supabase()
 
-        if st.button("🎯 Create Marker File"):
-            try:
-                with open("./storage/.index_ready", 'w') as f:
-                    f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                st.success("✅ Created .index_ready marker")
-            except Exception as e:
-                st.error(f"❌ Failed: {e}")
+    # Index bucket status
+    try:
+        index_files = [f['name'] for f in supabase.storage.from_('index').list()]
+        has_index = 'index_store.json' in index_files
+        has_vector = any('vector_store' in f for f in index_files)
+        st.caption(f"{'✅' if has_index else '❌'} index_store.json (Supabase)")
+        st.caption(f"{'✅' if has_vector else '❌'} vector_store.json (Supabase)")
+        st.caption(f"📁 Index files in Supabase: {len(index_files)}")
+    except Exception as e:
+        st.warning(f"⚠️ Could not check index bucket: {e}")
 
-        if st.button("🧹 Clean Old Backup Folders"):
-            removed = 0
-            for item in os.listdir("./storage"):
-                item_path = os.path.join("./storage", item)
-                if os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-                    removed += 1
-            st.success(f"Removed {removed} folder(s)") if removed > 0 else st.info("Already clean")
-    else:
-        st.warning("Storage folder not found")
-
-    if os.path.exists("./manuals"):
-        num = len([f for f in os.listdir("./manuals") if f.endswith('.pdf')])
-        st.caption(f"📚 Manuals: {num} file(s)")
+    # Manuals bucket status
+    try:
+        manual_files = [f['name'] for f in supabase.storage.from_('manuals').list()]
+        pdf_count = len([f for f in manual_files if f.endswith('.pdf')])
+        st.caption(f"📚 Manuals in Supabase: {pdf_count} file(s)")
+    except Exception as e:
+        st.warning(f"⚠️ Could not check manuals bucket: {e}")
 
 # ============================================================================
 # TAB 3 — BACKUP

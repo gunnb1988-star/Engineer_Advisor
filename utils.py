@@ -466,15 +466,20 @@ def insert_manuals_into_index(filenames):
     download_index_from_supabase()
 
     # Download any files not already local
+    # Use _supabase_direct() — safe for background threads (no session state)
+    sb = _supabase_direct()
+    if sb is None:
+        return False, "Could not connect to Supabase"
+
     for filename in filenames:
         local_path = f"./manuals/{filename}"
         if not os.path.exists(local_path):
-            data = download_manual(filename)
-            if data:
+            try:
+                data = sb.storage.from_(MANUALS_BUCKET).download(filename)
                 with open(local_path, 'wb') as f:
                     f.write(data)
-            else:
-                return False, f"Could not download {filename} from Supabase"
+            except Exception as e:
+                return False, f"Could not download {filename} from Supabase: {e}"
 
     try:
         # Load existing index or create empty one
