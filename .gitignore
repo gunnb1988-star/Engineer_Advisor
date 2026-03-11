@@ -2,8 +2,12 @@
 .streamlit/secrets.toml
 .env
 
-# Cached data (keep storage/ - it has the pre-built index!)
-# storage/  ← COMMENTED OUT - we want storage in repo!
+# PDFs — stored in Supabase Storage, not Git
+manuals/
+
+# Index — stored in Supabase Storage, not Git
+storage/
+
 *.zip
 storage_backup*
 
