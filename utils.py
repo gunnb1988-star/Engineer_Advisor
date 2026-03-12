@@ -400,16 +400,26 @@ def download_index_from_supabase():
     if supabase is None:
         return False
     try:
-        files_in_bucket = [f['name'] for f in supabase.storage.from_(INDEX_BUCKET).list()]
-        if 'index_store.json' not in files_in_bucket:
+        # Check if index exists by trying to download index_store.json directly
+        # (avoids list() API which can return empty due to SDK/bucket quirks)
+        os.makedirs("./storage", exist_ok=True)
+        try:
+            data = supabase.storage.from_(INDEX_BUCKET).download('index_store.json')
+        except Exception:
             return False  # No index stored yet
 
-        os.makedirs("./storage", exist_ok=True)
+        with open("./storage/index_store.json", 'wb') as f:
+            f.write(data)
+
         for filename in INDEX_FILES:
-            if filename in files_in_bucket:
+            if filename == 'index_store.json':
+                continue  # already downloaded
+            try:
                 data = supabase.storage.from_(INDEX_BUCKET).download(filename)
                 with open(f"./storage/{filename}", 'wb') as f:
                     f.write(data)
+            except Exception:
+                pass  # file may not exist, that's ok
         return True
     except Exception:
         return False
