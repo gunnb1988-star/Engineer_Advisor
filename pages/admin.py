@@ -127,10 +127,7 @@ with tab2:
             supabase = get_supabase()
             try:
                 from utils import INDEX_FILES
-                existing = [f['name'] for f in supabase.storage.from_('index').list()]
-                to_delete = [f for f in INDEX_FILES if f in existing]
-                if to_delete:
-                    supabase.storage.from_('index').remove(to_delete)
+                supabase.storage.from_('index').remove(INDEX_FILES)
             except Exception as e:
                 st.warning(f"Could not clear Supabase index: {e}")
             st.cache_resource.clear()
@@ -145,14 +142,16 @@ with tab2:
 
     # Index bucket status
     try:
-        index_files = [f['name'] for f in supabase.storage.from_('index').list()]
-        has_index = 'index_store.json' in index_files
-        has_vector = any('vector_store' in f for f in index_files)
+        test_data = supabase.storage.from_('index').download('index_store.json')
+        has_index = len(test_data) > 0
         st.caption(f"{'✅' if has_index else '❌'} index_store.json (Supabase)")
-        st.caption(f"{'✅' if has_vector else '❌'} vector_store.json (Supabase)")
-        st.caption(f"📁 Index files in Supabase: {len(index_files)}")
-    except Exception as e:
-        st.warning(f"⚠️ Could not check index bucket: {e}")
+        try:
+            vec_data = supabase.storage.from_('index').download('default__vector_store.json')
+            st.caption(f"{'✅' if len(vec_data) > 0 else '❌'} default__vector_store.json (Supabase)")
+        except Exception:
+            st.caption("❌ default__vector_store.json (Supabase)")
+    except Exception:
+        st.caption("❌ index_store.json (Supabase) — no index found")
 
     # Manuals bucket status
     try:
