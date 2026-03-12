@@ -411,7 +411,9 @@ def download_index_from_supabase():
                 with open(f"./storage/{filename}", 'wb') as f:
                     f.write(data)
         return True
-    except Exception:
+    except Exception as e:
+        import streamlit as st
+        st.warning(f"[DEBUG] download_index_from_supabase error: {e}")
         return False
 
 def upload_index_to_supabase():
