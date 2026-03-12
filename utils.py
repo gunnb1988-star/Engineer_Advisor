@@ -390,7 +390,9 @@ def _supabase_direct():
     """Create a Supabase client directly from secrets (safe inside cached functions)."""
     try:
         return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
-    except Exception:
+    except Exception as e:
+        import streamlit as _st
+        _st.warning(f"[DEBUG] _supabase_direct error: {e}")
         return None
 
 def download_index_from_supabase():
@@ -398,6 +400,8 @@ def download_index_from_supabase():
     Returns True if a valid index was found and downloaded."""
     supabase = _supabase_direct()
     if supabase is None:
+        import streamlit as st
+        st.warning("[DEBUG] download_index_from_supabase: _supabase_direct() returned None")
         return False
     try:
         files_in_bucket = [f['name'] for f in supabase.storage.from_(INDEX_BUCKET).list()]
