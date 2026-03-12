@@ -141,12 +141,14 @@ with tab2:
     supabase = get_supabase()
 
     # Index bucket status
+    from utils import _supabase_direct
+    _sb = _supabase_direct()
     try:
-        test_data = supabase.storage.from_('index').download('index_store.json')
+        test_data = _sb.storage.from_('index').download('index_store.json')
         has_index = len(test_data) > 0
         st.caption(f"{'✅' if has_index else '❌'} index_store.json (Supabase)")
         try:
-            vec_data = supabase.storage.from_('index').download('default__vector_store.json')
+            vec_data = _sb.storage.from_('index').download('default__vector_store.json')
             st.caption(f"{'✅' if len(vec_data) > 0 else '❌'} default__vector_store.json (Supabase)")
         except Exception:
             st.caption("❌ default__vector_store.json (Supabase)")
