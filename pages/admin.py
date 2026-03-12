@@ -24,10 +24,13 @@ with tab1:
 
     # Show background indexing status
     import builtins as _builtins
+    import time
     job = getattr(_builtins, '_index_job', None)
     if job:
         if not job['done']:
             st.warning(f"⏳ Indexing in progress: {', '.join(job['files'])} — you can navigate away safely")
+            time.sleep(3)
+            st.rerun()
         elif job['ok']:
             st.success(f"✅ Indexing complete: {', '.join(job['files'])}")
             st.cache_resource.clear()
@@ -56,9 +59,11 @@ with tab1:
             # Step 2 — Kick off indexing in a background thread so navigation won't kill it
             if success:
                 def _index_in_background(filenames):
-                    ok, err = insert_manuals_into_index(filenames)
-                    # Store result in a shared location for status checking
                     import builtins
+                    try:
+                        ok, err = insert_manuals_into_index(filenames)
+                    except Exception as e:
+                        ok, err = False, f"Unhandled exception: {e}"
                     builtins._index_job = {"done": True, "ok": ok, "err": err, "files": filenames}
 
                 builtins_import = __import__('builtins')
