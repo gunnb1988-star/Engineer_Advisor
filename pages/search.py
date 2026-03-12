@@ -38,16 +38,21 @@ def get_advisor_index():
     vector_files = ['vector_store.json', 'default__vector_store.json', 'image__vector_store.json']
 
     # Always try to restore index from Supabase Storage (overwrites stale local files)
-    download_index_from_supabase()
+    dl_ok = download_index_from_supabase()
+    st.info(f"[DEBUG] Supabase download: {'✅' if dl_ok else '❌ failed'}")
 
     has_required = all(os.path.exists(f"./storage/{f}") for f in required_files)
     has_vector = any(os.path.exists(f"./storage/{f}") for f in vector_files)
     has_marker = os.path.exists(marker_file)
+    local_files = os.listdir("./storage") if os.path.exists("./storage") else []
+    st.info(f"[DEBUG] Local storage files: {local_files}")
+    st.info(f"[DEBUG] has_required={has_required}, has_vector={has_vector}")
 
     if has_required and has_vector:
         try:
             sc = StorageContext.from_defaults(persist_dir=storage_path)
             index = load_index_from_storage(sc)
+            st.info("[DEBUG] Index loaded successfully from storage")
             if not has_marker:
                 try:
                     with open(marker_file, 'w') as f:
