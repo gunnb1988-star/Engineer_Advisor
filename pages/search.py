@@ -38,6 +38,16 @@ def get_advisor_index():
     vector_files = ['vector_store.json', 'default__vector_store.json', 'image__vector_store.json']
 
     # Always try to restore index from Supabase Storage (overwrites stale local files)
+    from utils import _supabase_direct, INDEX_BUCKET, INDEX_FILES
+    _sb = _supabase_direct()
+    if _sb is None:
+        st.info("[DEBUG] _supabase_direct returned None — secrets missing?")
+    else:
+        try:
+            _bucket_files = [f['name'] for f in _sb.storage.from_(INDEX_BUCKET).list()]
+            st.info(f"[DEBUG] Files in Supabase index bucket: {_bucket_files}")
+        except Exception as _e:
+            st.info(f"[DEBUG] Error listing index bucket: {_e}")
     dl_ok = download_index_from_supabase()
     st.info(f"[DEBUG] Supabase download: {'✅' if dl_ok else '❌ failed'}")
 
