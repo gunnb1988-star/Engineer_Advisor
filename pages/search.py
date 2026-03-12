@@ -44,8 +44,8 @@ def get_advisor_index():
         st.info("[DEBUG] _supabase_direct returned None — secrets missing?")
     else:
         try:
-            _bucket_files = [f['name'] for f in _sb.storage.from_(INDEX_BUCKET).list()]
-            st.info(f"[DEBUG] Files in Supabase index bucket: {_bucket_files}")
+            _raw = _sb.storage.from_(INDEX_BUCKET).list()
+            st.info(f"[DEBUG] Raw list() response: {_raw}")
         except Exception as _e:
             st.info(f"[DEBUG] Error listing index bucket: {_e}")
     dl_ok = download_index_from_supabase()
